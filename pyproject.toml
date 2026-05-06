@@ -1,0 +1,34 @@
+[project]
+name = "fzx"
+version = "0.1.0"
+description = "Shell-independent fzf helpers."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "Haruki Nakamura" }]
+
+[project.scripts]
+fzx = "fzx.cli:main"
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.11",
+  "ty>=0.0.1a8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
