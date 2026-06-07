@@ -9,6 +9,7 @@ from pathlib import Path
 from fzx.gitcmd import branch_name_from_line, commit_from_line, worktree_from_line
 from fzx.remove import remove_targets
 from fzx.repo import parse_repo_url, repo_list
+from fzx.shell import SUPPORTED_SHELLS, init_script
 from fzx.tools import (
     command_exists,
     directory_preview_command,
@@ -48,6 +49,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fzx")
     subparsers = parser.add_subparsers(required=True)
 
+    init = subparsers.add_parser("init")
+    init.add_argument("shell", choices=SUPPORTED_SHELLS)
+    init.set_defaults(func=cmd_init)
+
     history = subparsers.add_parser("history")
     history.set_defaults(func=cmd_history)
 
@@ -79,6 +84,11 @@ def build_parser() -> argparse.ArgumentParser:
     repo_cd = repo_subparsers.add_parser("cd")
     repo_cd.set_defaults(func=cmd_repo_cd)
     return parser
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    print(init_script(args.shell), end="")
+    return 0
 
 
 def cmd_history(_args: argparse.Namespace) -> int:

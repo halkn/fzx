@@ -34,6 +34,7 @@ uv tool install git+https://github.com/halkn/fzx
 ## Commands
 
 ```text
+fzx init zsh
 fzx history
 fzx cd
 fzx rm
@@ -50,26 +51,51 @@ fzx repo cd
 selected path or command to stdout. They are intended to be wrapped by the
 calling shell.
 
-Example zsh wrappers:
+## Shell Integration
+
+Rather than hand-writing wrappers, let `fzx` generate them. Add this to your
+`.zshrc`:
 
 ```zsh
-fh() {
-  local command
-  command=$(fc -l 1 | fzx history) || return
-  [[ -n "$command" ]] && print -z -- "$command"
-}
+eval "$(fzx init zsh)"
+```
 
-fcd() {
-  local dir
-  dir=$(fzx cd) || return
-  [[ -n "$dir" ]] && cd -- "$dir"
-}
+Because Python startup is slow, the integration is deliberately a *static*
+shell script: `fzx init zsh` only emits text. The Python process runs once at
+shell startup to produce that script, then only again when you actually invoke
+a widget — never on every prompt.
 
-fgw() {
-  local dir
-  dir=$(fzx git worktree) || return
-  [[ -n "$dir" ]] && cd -- "$dir"
-}
+`fzx init zsh` defines ZLE widgets and binds them by default:
+
+| Key         | Widget                    | Action                     |
+| ----------- | ------------------------- | -------------------------- |
+| `Ctrl-R`    | `fzx-history-widget`      | put a past command in the buffer |
+| `Alt-C`     | `fzx-cd-widget`           | `cd` into a directory      |
+| `Alt-W`     | `fzx-git-worktree-widget` | `cd` into a git worktree   |
+| `Alt-R`     | `fzx-repo-cd-widget`      | `cd` into a repository     |
+
+Configure it by setting these before the `eval` line:
+
+```zsh
+# Skip the default bindings and bind the widgets yourself.
+FZX_NO_DEFAULT_KEYBINDINGS=1
+eval "$(fzx init zsh)"
+bindkey '^R' fzx-history-widget
+
+# Or just override individual keys.
+FZX_HISTORY_KEY='^T'
+FZX_CD_KEY='^[c'
+FZX_GIT_WORKTREE_KEY='^[w'
+FZX_REPO_CD_KEY='^[r'
+eval "$(fzx init zsh)"
+```
+
+The generated script is static, so you can cache it to shave the one-time
+startup cost if you want:
+
+```zsh
+fzx init zsh > ~/.cache/fzx-init.zsh   # regenerate after upgrading fzx
+source ~/.cache/fzx-init.zsh
 ```
 
 ## Repo Layout
