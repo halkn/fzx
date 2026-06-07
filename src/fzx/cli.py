@@ -1,23 +1,13 @@
 from __future__ import annotations
 
-import argparse
-import os
-import subprocess
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from fzx.gitcmd import branch_name_from_line, commit_from_line, worktree_from_line
-from fzx.remove import remove_targets
-from fzx.repo import parse_repo_url, repo_list
 from fzx.shell import SUPPORTED_SHELLS, init_script
-from fzx.tools import (
-    command_exists,
-    directory_preview_command,
-    file_preview_command,
-    git_diff_preview_command,
-    git_show_preview_command,
-    tree_preview_command,
-)
+
+if TYPE_CHECKING:
+    import argparse
+    from pathlib import Path
 
 FZF_GIT_OPTS = [
     "--height",
@@ -34,6 +24,16 @@ FZF_GIT_OPTS = [
 
 
 def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    # Fast path: `fzx init <shell>` is run on every shell startup, so keep it
+    # away from argparse and the command modules (subprocess, repo, remove,
+    # tools) whose imports dominate startup. Anything malformed falls through
+    # to the full parser for proper errors and --help.
+    if len(argv) == 2 and argv[0] == "init" and argv[1] in SUPPORTED_SHELLS:
+        print(init_script(argv[1]), end="")
+        return 0
+
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
@@ -46,6 +46,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    import argparse
+    from pathlib import Path
+
     parser = argparse.ArgumentParser(prog="fzx")
     subparsers = parser.add_subparsers(required=True)
 
@@ -101,6 +104,10 @@ def cmd_history(_args: argparse.Namespace) -> int:
 
 
 def cmd_cd(_args: argparse.Namespace) -> int:
+    import subprocess
+
+    from fzx.tools import command_exists, directory_preview_command
+
     require_fzf()
     if command_exists("fd"):
         result = subprocess.run(
@@ -135,6 +142,11 @@ def cmd_cd(_args: argparse.Namespace) -> int:
 
 
 def cmd_rm(_args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    from fzx.remove import remove_targets
+    from fzx.tools import file_preview_command
+
     require_fzf()
     candidates = _file_candidates()
     selected = run_fzf(
@@ -170,6 +182,10 @@ def cmd_rm(_args: argparse.Namespace) -> int:
 
 
 def cmd_git_branch(_args: argparse.Namespace) -> int:
+    import subprocess
+
+    from fzx.gitcmd import branch_name_from_line
+
     require_fzf()
     branches = subprocess.run(
         ["git", "branch", "-a", "--color=always"],
@@ -202,6 +218,10 @@ def cmd_git_branch(_args: argparse.Namespace) -> int:
 
 
 def cmd_git_stage(_args: argparse.Namespace) -> int:
+    import subprocess
+
+    from fzx.tools import git_diff_preview_command
+
     require_fzf()
     status = _git_status_short()
     run_fzf(
@@ -228,6 +248,11 @@ def cmd_git_stage(_args: argparse.Namespace) -> int:
 
 
 def cmd_git_log(_args: argparse.Namespace) -> int:
+    import subprocess
+
+    from fzx.gitcmd import commit_from_line
+    from fzx.tools import git_show_preview_command
+
     require_fzf()
     log = subprocess.run(
         ["git", "log", "--oneline", "--color=always", "--decorate", "--all"],
@@ -258,6 +283,11 @@ def cmd_git_log(_args: argparse.Namespace) -> int:
 
 
 def cmd_git_worktree(_args: argparse.Namespace) -> int:
+    import subprocess
+
+    from fzx.gitcmd import worktree_from_line
+    from fzx.tools import tree_preview_command
+
     require_fzf()
     worktrees = subprocess.run(
         ["git", "worktree", "list"],
@@ -283,12 +313,18 @@ def cmd_git_worktree(_args: argparse.Namespace) -> int:
 
 
 def cmd_repo_list(args: argparse.Namespace) -> int:
+    from fzx.repo import repo_list
+
     root = _repo_root(args)
     print("\n".join(repo_list(root)))
     return 0
 
 
 def cmd_repo_get(args: argparse.Namespace) -> int:
+    import subprocess
+
+    from fzx.repo import parse_repo_url
+
     root = _repo_root(args)
     try:
         spec = parse_repo_url(args.url, root)
@@ -305,6 +341,8 @@ def cmd_repo_get(args: argparse.Namespace) -> int:
 
 
 def cmd_repo_cd(args: argparse.Namespace) -> int:
+    from fzx.repo import repo_list
+
     require_fzf()
     root = _repo_root(args)
     selected = run_fzf(repo_list(root), [])
@@ -314,6 +352,8 @@ def cmd_repo_cd(args: argparse.Namespace) -> int:
 
 
 def run_fzf(candidates: list[str], args: list[str]) -> str:
+    import subprocess
+
     input_text = "\n".join(candidates)
     if input_text:
         input_text += "\n"
@@ -330,16 +370,25 @@ def run_fzf(candidates: list[str], args: list[str]) -> str:
 
 
 def require_fzf() -> None:
+    from fzx.tools import command_exists
+
     if not command_exists("fzf"):
         raise FzxError("fzx: fzf is not installed or not in PATH")
 
 
 def _repo_root(args: argparse.Namespace) -> Path:
+    import os
+    from pathlib import Path
+
     value = args.root or os.environ.get("FZX_REPO_ROOT") or "~/dev"
     return Path(value).expanduser()
 
 
 def _file_candidates() -> list[str]:
+    import subprocess
+
+    from fzx.tools import command_exists
+
     if command_exists("fd"):
         result = subprocess.run(
             ["fd", "--hidden", "--strip-cwd-prefix", "--exclude", ".git"],
@@ -358,6 +407,8 @@ def _file_candidates() -> list[str]:
 
 
 def _git_status_short() -> list[str]:
+    import subprocess
+
     return subprocess.run(
         ["git", "-c", "color.status=always", "status", "--short"],
         check=False,
@@ -367,6 +418,9 @@ def _git_status_short() -> list[str]:
 
 
 def _history_lines() -> list[str]:
+    import os
+    from pathlib import Path
+
     if not sys.stdin.isatty():
         return sys.stdin.read().splitlines()
     histfile = os.environ.get("HISTFILE")

@@ -63,7 +63,30 @@ eval "$(fzx init zsh)"
 Because Python startup is slow, the integration is deliberately a *static*
 shell script: `fzx init zsh` only emits text. The Python process runs once at
 shell startup to produce that script, then only again when you actually invoke
-a widget — never on every prompt.
+a widget — never on every prompt. `init` itself is on a fast path that skips
+loading the command modules, so it is several times cheaper than a normal `fzx`
+command.
+
+### Cached startup (recommended for tmux / frequent shells)
+
+If you open new shells constantly (e.g. a fresh pane per tmux split), even the
+one `fzx init zsh` per startup adds up. Cache the generated script and source
+it instead; `fzx` then runs *only* after you upgrade it:
+
+```zsh
+() {
+  local cache="${XDG_CACHE_HOME:-$HOME/.cache}/fzx/init.zsh"
+  # Regenerate only when the fzx binary is newer than the cached script.
+  if [[ ! -r "$cache" || "$commands[fzx]" -nt "$cache" ]]; then
+    mkdir -p "${cache:h}"
+    fzx init zsh >| "$cache"
+  fi
+  source "$cache"
+}
+```
+
+Sourcing the cached file is a couple of milliseconds and starts no Python at
+all. Set any `FZX_*` configuration (below) before this block.
 
 `fzx init zsh` defines ZLE widgets and binds them by default:
 
